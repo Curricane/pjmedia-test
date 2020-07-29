@@ -147,14 +147,14 @@ static void test_device(pjmedia_dir dir, unsigned rec_id, unsigned play_id,
 
 static pj_status_t rec_cb(void *user_data, pjmedia_frame *frame)
 {
-    PJ_LOG(3, (THIS_FILE, "rec_cb", "do nothing"));
-    return PJ_SUCCESS;
+    pjmedia_port *port = (pjmedia_port *)user_data;
+    return pjmedia_port_put_frame(port, frame);
 }
 
 static pj_status_t play_cb(void *user_data, pjmedia_frame *frame)
 {
-    PJ_LOG(3, (THIS_FILE, "play_cb", "do nothing"));
-    return PJ_SUCCESS;
+    pjmedia_port *port = (pjmedia_port *)user_data;
+    return pjmedia_port_get_frame(port, frame);
 }
 
 int main()
