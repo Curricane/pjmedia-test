@@ -163,7 +163,7 @@ static const char *decode_caps(unsigned caps)
 
     for (i=0; i<31; ++i)
     {
-        if((1 << i) && caps)
+        if((1 << i) & caps)
         {
             const char *capname;
             capname = pjmedia_aud_dev_cap_name((pjmedia_aud_dev_cap)(1 << i), NULL);
@@ -340,6 +340,7 @@ static void print_menu(void)
     puts("-------------------------------");
     puts("  l                        List devices");
     puts("  t mic_id play_id         Perform test on the device: get mic and put to speaker ");
+    puts("  i ID                     Show device info for device ID");
     puts("  q                        Quit");
     puts("");
     printf("Enter selection: ");
@@ -402,55 +403,26 @@ int main()
                 }
                 test_rec_play(mic_id, play_id);
             }
-            
+            break;
+        case 'i':
+            {
+                unsigned dev_index;
+                if(sscanf(line+2, "%u", &dev_index) != 1)
+                {
+                    PJ_LOG(3, (THIS_FILE, "invalid param, we need 1 int"));
+                    break;
+                }
+                show_dev_info(dev_index);
+            }
             break;
         default:
             break;
         }
         
     }
-    // status = pjmedia_null_port_create(pool, param.clock_rate, param.channel_count, 
-    //     param.samples_per_frame, param.bits_per_sample, &port);
+
     pj_caching_pool_destroy(&cp);
     pj_shutdown();
     return 0;
 
 }
-
-
-
-/* 
-// 录音
-static pj_status_t wav_rec_cb(void *user_data, pjmedia_frame *frame)
-{
-    return pjmedia_port_put_frame((pjmedia_port*)user_data, frame);
-}
-static void record(unsigned rec_index, const char *filename)
-{
-    pjmedia_port *wav = NULL;
-    pjmedia_aud_param param;
-    pjmedia_aud_stream *strm = NULL;
-
-    pj_status_t status;
-    status = pjmedia_aud_stream_create(&param, &wav_rec_cb, NULL, wav,
-				       &strm);
-    status = pjmedia_aud_stream_start(strm);
-}
-
-// 播放
-static pj_status_t wav_play_cb(void *user_data, pjmedia_frame *frame)
-{
-    return pjmedia_port_get_frame((pjmedia_port*)user_data, frame);
-}
-static void play_file(unsigned play_index, const char *filename)
-{
-    pjmedia_port *wav = NULL;
-    pjmedia_aud_param param;
-    pjmedia_aud_stream *strm = NULL;
-    pj_status_t status;
-
-    status = pjmedia_aud_stream_create(&param, NULL, &wav_play_cb, wav,
-				       &strm);
-    status = pjmedia_aud_stream_start(strm);
-}
-*/
