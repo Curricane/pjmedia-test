@@ -415,6 +415,10 @@ int main()
                 show_dev_info(dev_index);
             }
             break;
+        case 'R':
+            pjmedia_aud_dev_refresh();
+            PJ_LOG(3, (THIS_FILE, "Audio device list refreshed."));
+            break;
         default:
             break;
         }
