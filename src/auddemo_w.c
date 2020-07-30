@@ -44,6 +44,7 @@ pj_status_t get_frame(void* data, pjmedia_frame *frame)
 
     status = pjmedia_delay_buf_get(port->delay_buf,
 				  (pj_int16_t*)frame->buf);
+    PJ_LOG(3, (THIS_FILE, " get frame frame size %d", frame->size));
     
     return status;
 }
@@ -55,6 +56,8 @@ pj_status_t put_frame(void* data, pjmedia_frame *frame)
         PJ_LOG(5, (THIS_FILE, "invalid param"));
         return -1;
     }
+
+    PJ_LOG(3, (THIS_FILE, " get frame frame size %d", frame->size));
 
     pj_status_t status;
     myport *port = (myport *)data;
@@ -100,7 +103,7 @@ pj_status_t create_myport(pj_pool_t *pool, myport **port)
 	    channel_count;
 
     status = pjmedia_delay_buf_create(pool, MYPORT.ptr, clock_rate, samples_per_frame, 
-        channel_count, ptime, 0, &mport->delay_buf);
+        channel_count, ptime * 2, 0, &mport->delay_buf);
 
     if(status != PJ_SUCCESS)
     {
@@ -272,7 +275,7 @@ int main()
     pjmedia_aud_param param;
     pjmedia_aud_stream *strm = NULL;
 
-    pjmedia_port *port = NULL;
+    myport *port = NULL;
 
     char line[10], *dummy; // get stdin for stop
 
@@ -304,19 +307,21 @@ int main()
         app_perror("pjmedia_aud_dev_default_param()", status);
         goto on_return;
     }
-    param.rec_id = 1;
-    param.play_id = 0;
+    param.rec_id = 0;
+    param.play_id = 1;
     param.dir = PJMEDIA_DIR_CAPTURE_PLAYBACK;
     param.clock_rate = 16000;
     param.samples_per_frame = 16000 / 1000 * 10;
     param.channel_count = 1;
     param.bits_per_sample = 16;
 
-    status = pjmedia_null_port_create(pool, param.clock_rate, param.channel_count, 
-        param.samples_per_frame, param.bits_per_sample, &port);
+    // status = pjmedia_null_port_create(pool, param.clock_rate, param.channel_count, 
+    //     param.samples_per_frame, param.bits_per_sample, &port);
+
+    status = create_myport(pool, &port);
     if (status != PJ_SUCCESS)
     {
-        app_perror("pjmedia_null_port_create()", status);
+        app_perror("create_myport()", status);
         goto on_return;
     }
 
