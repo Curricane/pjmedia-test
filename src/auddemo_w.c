@@ -44,7 +44,6 @@ pj_status_t get_frame(void* data, pjmedia_frame *frame)
 
     status = pjmedia_delay_buf_get(port->delay_buf,
 				  (pj_int16_t*)frame->buf);
-    PJ_LOG(3, (THIS_FILE, " get frame frame size %d", frame->size));
     
     return status;
 }
@@ -57,7 +56,6 @@ pj_status_t put_frame(void* data, pjmedia_frame *frame)
         return -1;
     }
 
-    PJ_LOG(3, (THIS_FILE, " put frame frame size %d", frame->size));
 
     pj_status_t status;
     myport *port = (myport *)data;
