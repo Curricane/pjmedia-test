@@ -57,7 +57,7 @@ pj_status_t put_frame(void* data, pjmedia_frame *frame)
         return -1;
     }
 
-    PJ_LOG(3, (THIS_FILE, " get frame frame size %d", frame->size));
+    PJ_LOG(3, (THIS_FILE, " put frame frame size %d", frame->size));
 
     pj_status_t status;
     myport *port = (myport *)data;
@@ -264,19 +264,94 @@ static pj_status_t play_cb(void *user_data, pjmedia_frame *frame)
     return pjmedia_port_get_frame(port, frame);
 }
 
+static void test_rec_play(int rec_id, int play_id)
+{
+    PJ_LOG(3, (THIS_FILE, "start test_rec_play"));
+    myport *port = NULL;
+    pj_pool_t *pool = NULL;
+    pjmedia_aud_stream *strm = NULL;
+    pjmedia_aud_param param;
+    pj_status_t status;
+
+    char line[10], *dummy; // get stdin for stop
+
+    pool = pj_pool_create(pjmedia_aud_subsys_get_pool_factory(), "wav",
+        1000, 1000, NULL);
+
+    status = pjmedia_aud_dev_default_param(0, &param);
+    if (status != PJ_SUCCESS)
+    {
+        app_perror("pjmedia_aud_dev_default_param()", status);
+        goto on_return;
+    }
+    param.rec_id = rec_id;
+    param.play_id = play_id;
+    param.dir = PJMEDIA_DIR_CAPTURE_PLAYBACK;
+    param.clock_rate = 16000;
+    param.samples_per_frame = 16000 / 1000 * 10;
+    param.channel_count = 1;
+    param.bits_per_sample = 16;
+
+    status = create_myport(pool, &port);
+    if (status != PJ_SUCCESS)
+    {
+        app_perror("create_myport()", status);
+        goto on_return;
+    }
+
+    PJ_LOG(3, (THIS_FILE, "pjmedia_aud_stream_create"));
+
+    status = pjmedia_aud_stream_create(&param, &rec_cb, &play_cb, port, &strm);
+    if (status != PJ_SUCCESS) 
+    {
+        app_perror("Error create aud stream", status);
+        goto on_return;
+    }
+
+    status = pjmedia_aud_stream_start(strm);
+    if (status != PJ_SUCCESS)
+    {
+        app_perror("Error starting the sound device", status);
+        goto on_return;
+    }
+
+    PJ_LOG(3, (THIS_FILE, "stream started, press ENTER to stop"));
+    dummy = fgets(line, sizeof(line), stdin);
+    PJ_UNUSED_ARG(dummy);
+
+    on_return:
+    if (strm)
+    {
+        pjmedia_aud_stream_stop(strm);
+        pjmedia_aud_stream_destroy(strm);
+    }
+
+    if (pool)
+    {
+        pj_pool_release(pool);
+    }
+
+}
+
+static void print_menu(void)
+{
+    puts("");
+    puts("Audio demo menu:");
+    puts("-------------------------------");
+    puts("  l                        List devices");
+    puts("  t mic_id play_id         Perform test on the device: get mic and put to speaker ");
+    puts("  q                        Quit");
+    puts("");
+    printf("Enter selection: ");
+    fflush(stdout);
+}
+
 int main()
 {
     pj_caching_pool cp;
-
+    pj_bool_t done = PJ_FALSE;
     pj_pool_t *pool = NULL;
-    
     pj_status_t status;
-
-    pjmedia_aud_param param;
-    pjmedia_aud_stream *strm = NULL;
-
-    myport *port = NULL;
-
     char line[10], *dummy; // get stdin for stop
 
     // Init pjlib
@@ -297,65 +372,45 @@ int main()
 
     list_devices();
 
-    PJ_LOG(3, (THIS_FILE, "start audio test"));
-    pool = pj_pool_create(pjmedia_aud_subsys_get_pool_factory(), "wav",
-        1000, 1000, NULL);
-
-    status = pjmedia_aud_dev_default_param(0, &param);
-    if (status != PJ_SUCCESS)
+    while (!done)
     {
-        app_perror("pjmedia_aud_dev_default_param()", status);
-        goto on_return;
-    }
-    param.rec_id = 0;
-    param.play_id = 1;
-    param.dir = PJMEDIA_DIR_CAPTURE_PLAYBACK;
-    param.clock_rate = 16000;
-    param.samples_per_frame = 16000 / 1000 * 10;
-    param.channel_count = 1;
-    param.bits_per_sample = 16;
+        char line[80];
 
+        print_menu();
+
+        if (fgets(line, sizeof(line), stdin) == NULL)
+            break;
+
+        switch (line[0])
+        {
+        case 'l':
+            list_devices();
+            break;
+        case 'q': 
+            done = PJ_TRUE;
+            break;
+        case 't':
+            {
+                int mic_id = -1, play_id = -1;
+                int count;
+                count = sscanf(line+2, "%d %d", &mic_id, &play_id);
+                if (count != 2)
+                {
+                    PJ_LOG(3, (THIS_FILE, "invalid param, we need 2 int"));
+                    PJ_LOG(3, (THIS_FILE, "mic_id: %d, play_id: %d, count: %d", mic_id, play_id, count));
+                    break;
+                }
+                test_rec_play(mic_id, play_id);
+            }
+            
+            break;
+        default:
+            break;
+        }
+        
+    }
     // status = pjmedia_null_port_create(pool, param.clock_rate, param.channel_count, 
     //     param.samples_per_frame, param.bits_per_sample, &port);
-
-    status = create_myport(pool, &port);
-    if (status != PJ_SUCCESS)
-    {
-        app_perror("create_myport()", status);
-        goto on_return;
-    }
-
-    PJ_LOG(3, (THIS_FILE, "pjmedia_aud_stream_create"));
-    status = pjmedia_aud_stream_create(&param, &rec_cb, &play_cb, port, &strm);
-    if (status != PJ_SUCCESS) 
-    {
-        app_perror("Error create aud stream", status);
-        goto on_return;
-    }
-
-    status = pjmedia_aud_stream_start(strm);
-    if (status != PJ_SUCCESS)
-    {
-        app_perror("Error starting the sound device", status);
-        goto on_return;
-    }
-
-    PJ_LOG(3, (THIS_FILE, "stream started, press ENTER to stop"));
-    dummy = fgets(line, sizeof(line), stdin);
-    PJ_UNUSED_ARG(dummy);
-    
-
-on_return:
-    if (strm)
-    {
-        pjmedia_aud_stream_stop(strm);
-        pjmedia_aud_stream_destroy(strm);
-    }
-
-    if (pool)
-    {
-        pj_pool_release(pool);
-    }
     pj_caching_pool_destroy(&cp);
     pj_shutdown();
     return 0;
