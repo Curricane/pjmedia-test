@@ -8,9 +8,113 @@
 #define MAX_DEVICES 64
 #define WAV_FILE "auddemo_w.wav"
 
+#define PJMEDIA_SIG_PORT_MY		PJMEDIA_SIG_CLASS_PORT_AUD('M','Y')
+#define SIGNATURE   PJMEDIA_SIG_PORT_MY
+
 static unsigned dev_count;
 static unsigned playback_lat = PJMEDIA_SND_DEFAULT_PLAY_LATENCY;
 static unsigned capture_lat = PJMEDIA_SND_DEFAULT_REC_LATENCY;
+
+static unsigned int clock_rate = 16000;
+static unsigned int samples_per_frame = 16000 / 1000 * 10;
+static unsigned int channel_count = 1;
+static unsigned int bits_per_sample = 16;
+
+struct myport 
+{
+    pjmedia_port base;
+    pjmedia_delay_buf *delay_buf;
+};
+
+typedef struct myport myport;
+
+pj_status_t get_frame(void* data, pjmedia_frame *frame)
+{
+    if (NULL == data || NULL == frame)
+    {
+        PJ_LOG(5, (THIS_FILE, "invalid param"));
+        return -1;
+    }
+
+    pj_status_t status;
+
+    myport *port = (myport *)data;
+    PJ_ASSERT_RETURN(port->delay_buf != NULL, -1);
+
+
+    status = pjmedia_delay_buf_get(port->delay_buf,
+				  (pj_int16_t*)frame->buf);
+    
+    return status;
+}
+
+pj_status_t put_frame(void* data, pjmedia_frame *frame)
+{
+    if (NULL == data || NULL == frame)
+    {
+        PJ_LOG(5, (THIS_FILE, "invalid param"));
+        return -1;
+    }
+
+    pj_status_t status;
+    myport *port = (myport *)data;
+    PJ_ASSERT_RETURN(port->delay_buf != NULL, -1);
+
+    status = pjmedia_delay_buf_put(port->delay_buf, (pj_int16_t*)frame->buf);
+
+    return status;
+
+}
+
+pj_status_t my_on_destory(void* data)
+{
+    if (NULL == data)
+    {
+        PJ_LOG(5, (THIS_FILE, "invalid param"));
+        return PJ_SUCCESS;
+    }
+    
+    pj_status_t status;
+    myport *port = (myport *)data;
+
+    status = pjmedia_delay_buf_destroy(port->delay_buf);
+    
+    return status;
+}
+
+pj_status_t create_myport(pj_pool_t *pool, myport **port)
+{
+    const pj_str_t MYPORT = { "MYPORT", 6 };
+    pj_status_t status;
+    myport *mport;
+    unsigned int ptime;
+
+    // create the port and the AEC itself 
+    mport = PJ_POOL_ZALLOC_T(pool, myport);
+
+    pjmedia_port_info_init(&mport->base.info, &MYPORT, SIGNATURE, 
+        clock_rate, channel_count, bits_per_sample, samples_per_frame);
+
+    /* Passive port has delay buf. */
+    ptime = samples_per_frame * 1000 / clock_rate / 
+	    channel_count;
+
+    status = pjmedia_delay_buf_create(pool, MYPORT.ptr, clock_rate, samples_per_frame, 
+        channel_count, ptime, 0, &mport->delay_buf);
+
+    if(status != PJ_SUCCESS)
+    {
+        PJ_LOG(3, (THIS_FILE, "faied to pjmedia_delay_buf_create"));
+        return status;
+    }
+
+    mport->base.get_frame = &get_frame;
+    mport->base.put_frame = &put_frame;
+    mport->base.on_destroy = &my_on_destory;
+
+    *port = mport;
+    return PJ_SUCCESS;
+}
 
 static void app_perror(const char *title, pj_status_t status)
 {
