@@ -10,7 +10,7 @@
 /* For logging purpose. */
 #define THIS_FILE   "confsample_w.c"
 
-/*
+/* 显示的声明pjmedia_conf，才能显示使用pjmeida_conf中的参数
  * Conference bridge.
  */
 struct pjmedia_conf
