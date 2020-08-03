@@ -10,6 +10,26 @@
 /* For logging purpose. */
 #define THIS_FILE   "confsample_w.c"
 
+/*
+ * Conference bridge.
+ */
+struct pjmedia_conf
+{
+    unsigned		  options;	/**< Bitmask options.		    */
+    unsigned		  max_ports;	/**< Maximum ports.		    */
+    unsigned		  port_cnt;	/**< Current number of ports.	    */
+    unsigned		  connect_cnt;	/**< Total number of connections    */
+    pjmedia_snd_port	 *snd_dev_port;	/**< Sound device port.		    */
+    pjmedia_port	 *master_port;	/**< Port zero's port.		    */
+    char		  master_name_buf[80]; /**< Port0 name buffer.	    */
+    pj_mutex_t		 *mutex;	/**< Conference mutex.		    */
+    struct conf_port	**ports;	/**< Array of ports.		    */
+    unsigned		  clock_rate;	/**< Sampling rate.		    */
+    unsigned		  channel_count;/**< Number of channels (1=mono).   */
+    unsigned		  samples_per_frame;	/**< Samples per frame.	    */
+    unsigned		  bits_per_sample;	/**< Bits per sample.	    */
+};
+
 static const char *desc = 
  " FILE:								    \n"
  "									    \n"
@@ -100,7 +120,7 @@ int main(int argc, char *argv[])
     
     pjmedia_port *rec_port;
 
-    int i, port_count;
+    int i = 0, port_count = 2;
 
     char tmp[10];
     pj_status_t status;
@@ -186,6 +206,101 @@ int main(int argc, char *argv[])
         puts("  d    Disconnect port connection");
         puts("  q    Quit");
 	    puts("");
+
+        printf("Enter selection: "); fflush(stdout);
+        
+        if (fgets(tmp, sizeof(tmp), stdin) == NULL)
+            break;
+        
+        switch (tmp[0])
+        {
+            case 's': 
+                puts("");
+                conf_list(conf, 1);
+                break;
+
+            case 'c': 
+                puts("");
+                puts("Connect source port to destination port");
+                if (!input("Enter source port number", tmp1, sizeof(tmp1)))
+                    continue;
+                src = strtol(tmp1, &err, 10);
+                if (*err || src < 0 || src >= port_count)
+                {
+                    puts("Invalid slot number");
+                    continue;
+                }
+                puts("Connect dst port to destination port");
+                if (!input("Enter dst port number", tmp2, sizeof(tmp1)))
+                    continue;
+                dst = strtol(tmp2, &err, 10);
+                if (*err || dst < 0 || dst >= port_count) {
+                    puts("Invalid slot number");
+                    continue;
+                }
+                status = pjmedia_conf_connect_port(conf, src, dst, 0);
+                break;
+            case 'd': 
+                puts("");
+                puts("Disconnect port connection");
+                if (!input("Enter source port number", tmp1, sizeof(tmp1)))
+                    continue;
+                src = strtol(tmp1, &err, 10);
+                if (*err || src < 0 || src >= port_count)
+                {
+                    puts("Invalid slot number");
+                    continue;
+                }
+                puts("Connect dst port to destination port");
+                if (!input("Enter dst port number", tmp2, sizeof(tmp1)))
+                    continue;
+                dst = strtol(tmp2, &err, 10);
+                if (*err || dst < 0 || dst >= port_count) {
+                    puts("Invalid slot number");
+                    continue;
+                }
+                status = pjmedia_conf_disconnect_port(conf, src, dst);
+                if (status != PJ_SUCCESS)
+		            app_perror(THIS_FILE, "Error connecting port", status);
+                break;
+            case 'e':
+                puts("");
+                puts("reset echo param");
+                if (!input("Enter options", tmp1, sizeof(tmp1)))
+                    continue;
+                src = strtol(tmp1, &err, 10);
+                if (*err || src < 0)
+                {
+                    puts("Invalid ec_options");
+                    continue;
+                }
+                if (!input("Enter tail", tmp2, sizeof(tmp2)))
+                    continue;
+                dst = strtol(tmp2, &err, 10);
+                if (*err || dst < 0)
+                {
+                    puts("Invalid tail");
+                    continue;
+                }
+
+                status = pjmedia_snd_port_set_ec(conf->snd_dev_port, pool, dst, src);
+                if (status != PJ_SUCCESS)
+                {
+                    PJ_LOG(3, (THIS_FILE, "failed to set ec tail:%d options: %d", dst, src));
+                    continue;
+                }
+
+                break;
+
+            case 'q':
+	            goto on_quit;
+            
+            default:
+                printf("Invalid input character '%c'\n", tmp[0]);
+                break;
+
+
+        }
     }
 
 
