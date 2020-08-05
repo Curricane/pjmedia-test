@@ -1,12 +1,13 @@
 CC = gcc
 CFLAGS = -g -Wall -O
 INCLUDE = -I./include
-Libs =  -lpjsua2-x86_64-apple-darwin19.6.0 \
+
+# -lpjsua2-x86_64-apple-darwin19.6.0 \
 	-lstdc++ -lpjsua-x86_64-apple-darwin19.6.0 \
 	-lpjsip-ua-x86_64-apple-darwin19.6.0 \
 	-lpjsip-simple-x86_64-apple-darwin19.6.0 \
-	-lpjsip-x86_64-apple-darwin19.6.0 \
-	-lpjmedia-codec-x86_64-apple-darwin19.6.0 \
+	-lpjsip-x86_64-apple-darwin19.6.0 
+Libs =  -lpjmedia-codec-x86_64-apple-darwin19.6.0 \
 	-lpjmedia-x86_64-apple-darwin19.6.0 \
 	-lpjmedia-videodev-x86_64-apple-darwin19.6.0 \
 	-lpjmedia-audiodev-x86_64-apple-darwin19.6.0 \
@@ -26,11 +27,11 @@ Libs =  -lpjsua2-x86_64-apple-darwin19.6.0 \
 	-framework CoreMedia -framework VideoToolbox  -lSDL2   -framework Security
 LIBPATH = -L./lib
 
-BIN = simpleua auddemo auddemo_w confsample confsample_w
+BIN =  auddemo auddemo_w confsample confsample_w
 
-OBJ1 = simpleua.o 
-SRC1 = ./src/simpleua.c 
-BIN1 = simpleua
+# OBJ1 = simpleua.o 
+# SRC1 = ./src/simpleua.c 
+# BIN1 = simpleua
 
 OBJ2 = auddemo.o 
 SRC2 = ./src/auddemo.c 
@@ -50,8 +51,8 @@ BIN5 = confsample_w
 
 all: $(BIN)
 
-$(BIN1):$(SRC1)
-	$(CC) $(CFLAGS) $(INCLUDE) -o $(BIN1) $(SRC1) $(Libs) $(LIBPATH) 
+# $(BIN1):$(SRC1)
+# 	$(CC) $(CFLAGS) $(INCLUDE) -o $(BIN1) $(SRC1) $(Libs) $(LIBPATH) 
 $(BIN2):$(SRC2)
 	$(CC) $(CFLAGS) $(INCLUDE) -o $(BIN2) $(SRC2) $(Libs) $(LIBPATH) 
 $(BIN3):$(SRC3)
