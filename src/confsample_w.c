@@ -9,6 +9,7 @@
 
 /* For logging purpose. */
 #define THIS_FILE   "confsample_w.c"
+#define RECORDER 1
 
 /* 显示的声明pjmedia_conf，才能显示使用pjmeida_conf中的参数
  * Conference bridge.
@@ -118,9 +119,10 @@ int main(int argc, char *argv[])
     pj_pool_t *pool;
     pjmedia_conf *conf;
     
+    pjmedia_port **file_port; // array of file ports for wav player
     pjmedia_port *rec_port;
 
-    int i = 0, port_count = 2;
+    int i = 0, port_count = 2, file_count = 0;
 
     char tmp[10];
     pj_status_t status;
@@ -155,12 +157,15 @@ int main(int argc, char *argv[])
 			   NULL		    /* callback on error    */
 			   );
 
+    file_count = argc - pj_optind;
+    port_count = file_count + 1 + RECORDER;
+
     /* Create the conference bridge. 
      * With default options (zero), the bridge will create an instance of
      * sound capture and playback device and connect them to slot zero.
      */
     status = pjmedia_conf_create( pool, 
-        2,
+        port_count,
         clock_rate,
         channel_count,
         samples_per_frame,
@@ -174,13 +179,56 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+#if RECORDER
     status = pjmedia_wav_writer_port_create(pool, "confwrite.wav", 
                     clock_rate, channel_count,
                     samples_per_frame,
                     bits_per_sample, 0, 0,
                     &rec_port);
+    if (status != PJ_SUCCESS) 
+    {
+        app_perror(THIS_FILE, "Unable to create WAV writer", status);
+        return 1;
+    }
     pjmedia_conf_add_port(conf, pool, rec_port, NULL, NULL);
+#endif
 
+    // Create file ports. */
+    file_port = pj_pool_alloc(pool, file_count * sizeof(pjmedia_port*));
+
+
+    // create file ports
+    for (i = 0; i < file_count; ++i)
+    {
+        // Load the wav file to file port
+        status = pjmedia_wav_player_port_create(
+            pool, argv[i+pj_optind],
+            0,
+            0,
+            0,
+            &file_port[i]);
+        if (status != PJ_SUCCESS)
+        {
+            char title[80];
+            pj_ansi_sprintf(title, "Unable to use %s", argv[i+pj_optind]);
+            app_perror(THIS_FILE, title, status);
+            usage();
+            return 1;
+        }
+
+        // add the file port to conference bridge
+        status = pjmedia_conf_add_port( conf, 
+            pool,
+            file_port[i],
+            NULL,
+            NULL);
+
+        if (status != PJ_SUCCESS) 
+        {
+            app_perror(THIS_FILE, "Unable to add conference port", status);
+            return 1;
+	    }
+    }
     /* Dump memory usage */
     dump_pool_usage(THIS_FILE, &cp);
 
