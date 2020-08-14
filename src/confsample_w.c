@@ -1,3 +1,5 @@
+#include <pjmedia-audiodev/audiodev.h>
+
 #include <pjmedia.h>
 #include <pjlib-util.h>	/* pj_getopt */
 #include <pjlib.h>
@@ -29,6 +31,40 @@ struct pjmedia_conf
     unsigned		  channel_count;/**< Number of channels (1=mono).   */
     unsigned		  samples_per_frame;	/**< Samples per frame.	    */
     unsigned		  bits_per_sample;	/**< Bits per sample.	    */
+};
+
+struct pjmedia_snd_port
+{
+    int			 rec_id;
+    int			 play_id;
+    pj_uint32_t		 aud_caps;
+    pjmedia_aud_param	 aud_param;
+    pjmedia_aud_stream	*aud_stream;
+    pjmedia_dir		 dir;
+    pjmedia_port	*port;
+
+    pjmedia_clock_src    cap_clocksrc,
+                         play_clocksrc;
+
+    unsigned		 clock_rate;
+    unsigned		 channel_count;
+    unsigned		 samples_per_frame;
+    unsigned		 bits_per_sample;
+    unsigned		 options;
+    unsigned		 prm_ec_options;
+
+    /* software ec */
+    pjmedia_echo_state	*ec_state;
+    unsigned		 ec_options;
+    unsigned		 ec_tail_len;
+    pj_bool_t		 ec_suspended;
+    unsigned		 ec_suspend_count;
+    unsigned		 ec_suspend_limit;
+
+    /* audio frame preview callbacks */
+    void		*user_data;
+    pjmedia_aud_play_cb  on_play_frame;
+    pjmedia_aud_rec_cb   on_rec_frame;
 };
 
 static const char *desc = 
@@ -70,6 +106,34 @@ static void conf_list(pjmedia_conf *conf, pj_bool_t detail);
 
 /* Display VU meter */
 static void monitor_level(pjmedia_conf *conf, int slot, int dir, int dur);
+
+pj_status_t spk_put_frame(pjmedia_port *this_port, 
+			     pjmedia_frame *frame)
+{
+    static int put_count = 0;
+    if (put_count > 2147483647)
+        put_count = 0;
+    ++put_count;
+    if (put_count % 1000 == 0)
+    {
+        PJ_LOG(3, (THIS_FILE, "spk_put_frame: %d", put_count));
+    }
+    return PJ_SUCCESS;
+}
+
+pj_status_t spk_get_frame (pjmedia_port *this_port, 
+			     pjmedia_frame *frame)
+{
+    static int get_count = 0;
+    if (get_count > 2147483647)
+        get_count = 0;
+    ++get_count;
+    if (get_count % 1000 == 0)
+    {
+        PJ_LOG(3, (THIS_FILE, "spk_get_frame: %d", get_count));
+    }
+    return PJ_SUCCESS;
+}
 
 /* Show usage */
 static void usage(void)
@@ -158,7 +222,7 @@ int main(int argc, char *argv[])
 			   );
 
     file_count = argc - pj_optind;
-    port_count = file_count + 1 + RECORDER;
+    port_count = file_count + 1 + RECORDER + 2;
 
     /* Create the conference bridge. 
      * With default options (zero), the bridge will create an instance of
@@ -234,6 +298,78 @@ int main(int argc, char *argv[])
 
     /* Sleep to allow log messages to flush */
     pj_thread_sleep(100);
+
+    // 创建一个扬声器snd
+    // 怎么识别扬声器与mic
+    int dev_count = 0;
+    dev_count = pjmedia_aud_dev_count();
+    if (dev_count == 0)
+    {
+        PJ_LOG(3,(THIS_FILE, "No devices found"));
+    }
+    int j = 0;
+    int speaker_id = 0;
+    int mic_id = 0;
+    for (; j < dev_count; ++j)
+    {
+        pjmedia_aud_dev_info info;
+        status = pjmedia_aud_dev_get_info(j, &info);
+        if (status != PJ_SUCCESS)
+        {
+            PJ_LOG(3,(THIS_FILE, "failed to get the %dth dev info", j));
+            continue;
+        }
+
+        PJ_LOG(3, (THIS_FILE, " %2d: %s [%s] (%d/%d) default_sp %d", 
+            j, info.driver, info.name, info.input_count, info.output_count, info.default_samples_per_sec));
+        
+        // 知道MacBook pro扬声器对应的index
+        if (info.input_count == 0 && info.name[0] == 'M')
+        {
+            speaker_id = j;
+            PJ_LOG(3, (THIS_FILE, "find MacBook Pro 扬声器 对应的index： %d", speaker_id));
+        }
+
+        if (info.input_count != 0 && info.name[0] == 'M')
+        {
+            mic_id = j;
+            PJ_LOG(3, (THIS_FILE, "find MacBook Pro 麦克风 对应的index： %d", mic_id));
+        }
+    }
+
+    // 创建一个speaker snd
+    struct conf_port *spk_conf_port;
+    pjmedia_snd_port *spk_snd;
+    pj_str_t spk_name = {"snd/speaker", 11};
+
+    status =pjmedia_snd_port_create_player(pool, speaker_id, conf->clock_rate, 
+            conf->channel_count, conf->samples_per_frame,
+            conf->bits_per_sample, 0,  &spk_snd);
+    if (status != PJ_SUCCESS)
+    {
+        PJ_LOG(3, (THIS_FILE, "failed to pjmedia_snd_port_create_player"));
+        return status;
+    }
+
+    // snd缺少一个port去add
+    spk_snd->port = PJ_POOL_ZALLOC_T(pool, pjmedia_port);
+    pj_str_t spk_port_name = {"Snd", 3};
+    pjmedia_port_info_init(&spk_snd->port->info, 
+        &spk_port_name, 0, conf->clock_rate, 
+        conf->channel_count, conf->bits_per_sample, 
+        conf->samples_per_frame);
+    spk_snd->port->port_data.pdata = spk_snd;
+    spk_snd->port->port_data.ldata = 0;
+    // spk_snd->port->get_frame = spk_get_frame;
+    spk_snd->port->put_frame = spk_put_frame;
+    // 把snd 变为conf_port
+    pjmedia_conf_add_port(conf, pool, spk_snd->port, &spk_name, NULL);
+    if (status != PJ_SUCCESS)
+    {
+        PJ_LOG(3, (THIS_FILE, "failed to pjmedia_conf_add_port add snd"));
+        return status;
+    }
+
 
     /*
      * UI Menu: 
