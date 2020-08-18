@@ -44,17 +44,21 @@ pj_status_t external_get_frame(pjmedia_port* data, pjmedia_frame *frame)
 // conf提供数据给rj_port
 pj_status_t external_put_frame(pjmedia_port* data, pjmedia_frame *frame)
 {
-    
+
     PJ_ASSERT_RETURN(data && frame, -1);
+    
+    if (frame->buf == NULL)
+    {
+        PJ_LOG(5, (THIS_FILE, "external_put_frame  frame->buf == NULL"));
+        return PJ_SUCCESS;
+    }
 
     pj_status_t status;
 
     rj_port *port = (rj_port *)data;
     PJ_ASSERT_RETURN(port->rj11_out_buf != NULL, -1);
-    PJ_ASSERT_RETURN(frame->buf != NULL, -1);
-
+    
     status = pjmedia_delay_buf_put(port->rj11_out_buf, (pj_int16_t*)frame->buf);
-    PJ_LOG(3, (THIS_FILE, "end external_put_frame"));
     return status;
 }
 
@@ -355,11 +359,11 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    pjmedia_snd_port_destroy(conf->snd_dev_port);
+    //pjmedia_snd_port_destroy(conf->snd_dev_port);
 
     int log_level = pj_log_get_level();
     printf("the log level is %d \n", log_level);
-    //pj_log_set_level(3);
+    pj_log_set_level(3);
 
 #if RECORDER
     status = pjmedia_wav_writer_port_create(pool, "confwrite.wav", 
@@ -442,7 +446,7 @@ int main(int argc, char *argv[])
             j, info.driver, info.name, info.input_count, info.output_count, info.default_samples_per_sec));
         
         // 知道MacBook pro扬声器对应的index
-        if (info.input_count == 0 && info.name[0] == 'M')
+        if (info.input_count == 0 && info.name[0] != 'M')
         {
             speaker_id = j;
             PJ_LOG(3, (THIS_FILE, "find MacBook Pro 扬声器 对应的index： %d", speaker_id));
@@ -490,12 +494,19 @@ int main(int argc, char *argv[])
     // // spk_snd->port->get_frame = spk_get_frame;
     // spk_snd->port->put_frame = spk_put_frame;
     // 把snd 变为conf_port
-    pjmedia_conf_add_port(conf, pool, &rj->external, &spk_name, NULL);
+    unsigned int slot_num;
+    pjmedia_conf_add_port(conf, pool, &rj->external, &spk_name, &slot_num);
     if (status != PJ_SUCCESS)
     {
         PJ_LOG(3, (THIS_FILE, "failed to pjmedia_conf_add_port add snd"));
         return status;
     }
+    // status =  pjmedia_conf_connect_port(conf, 0, slot_num, 0);
+    // if (status != PJ_SUCCESS)
+    // {
+    //     PJ_LOG(3, (THIS_FILE, "failed to pjmedia_conf_connect_port "));
+    //     return status;
+    // }
 
 
     /*
