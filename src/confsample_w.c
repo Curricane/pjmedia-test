@@ -40,6 +40,14 @@ pj_status_t external_get_frame(pjmedia_port* data, pjmedia_frame *frame)
     PJ_ASSERT_RETURN(port->rj11_in_buf != NULL, -1);
 
     status = pjmedia_delay_buf_get(port->rj11_in_buf, (pj_int16_t*)frame->buf);
+    if(status == PJ_SUCCESS)
+    {
+        PJ_LOG(3, (THIS_FILE, "external get frame: %d", frame->size));
+    }
+    else
+    {
+        PJ_LOG(3, (THIS_FILE, "external get frame: failed"));
+    }
     return status;
 }
 
@@ -60,7 +68,7 @@ pj_status_t external_put_frame(pjmedia_port* data, pjmedia_frame *frame)
     rj_port *port = (rj_port *)data;
     PJ_ASSERT_RETURN(port->rj11_out_buf != NULL, -1);
     
-    PJ_LOG(3, (THIS_FILE, "put fame->size is: %d", frame->size));
+    PJ_LOG(3, (THIS_FILE, "external put fame->size is: %d", frame->size));
     status = pjmedia_delay_buf_put(port->rj11_out_buf, (pj_int16_t*)frame->buf);
     return status;
 }
@@ -79,6 +87,8 @@ pj_status_t internal_put_frame(pjmedia_port* data, pjmedia_frame *frame)
     pj_status_t status;
 
     rj_port *port = (rj_port*)(data->port_data.pdata);
+
+    PJ_LOG(3, (THIS_FILE, "internal put fame->size is: %d", frame->size));
 
     status = pjmedia_delay_buf_put(port->rj11_in_buf, (pj_int16_t*)frame->buf);
 
@@ -478,8 +488,11 @@ int main(int argc, char *argv[])
     pjmedia_rj11_port *spk_snd;
     pj_str_t spk_name = {"snd/speaker", 11};
 
-    status = pjmedia_rj11_port_create_player(pool, speaker_id, conf->clock_rate, conf->channel_count,
-        conf->samples_per_frame, conf->bits_per_sample, 0, &spk_snd);
+    // status = pjmedia_rj11_port_create_player(pool, speaker_id, conf->clock_rate, conf->channel_count,
+    //     conf->samples_per_frame, conf->bits_per_sample, 0, &spk_snd);
+    status = pjmedia_rj11_port_create(pool, mic_id, speaker_id,
+        conf->clock_rate, conf->channel_count, conf->samples_per_frame,
+        conf->bits_per_sample, 0, &spk_snd );
     if (status != PJ_SUCCESS)
     {
         PJ_LOG(3, (THIS_FILE, "failed to pjmedia_rj11_port_create_player"));
