@@ -26,10 +26,12 @@ typedef struct rj_port rj_port;
 // conf从rj_port获取数据
 pj_status_t external_get_frame(pjmedia_port* data, pjmedia_frame *frame)
 {
-    if (NULL == data || NULL == frame)
+    PJ_ASSERT_RETURN(data && frame, -1);
+    
+    if (frame->buf == NULL)
     {
-        PJ_LOG(5, (THIS_FILE, "invalid param"));
-        return -1;
+        PJ_LOG(5, (THIS_FILE, "external_get_frame  frame->buf == NULL"));
+        return PJ_SUCCESS;
     }
 
     pj_status_t status;
@@ -58,6 +60,7 @@ pj_status_t external_put_frame(pjmedia_port* data, pjmedia_frame *frame)
     rj_port *port = (rj_port *)data;
     PJ_ASSERT_RETURN(port->rj11_out_buf != NULL, -1);
     
+    PJ_LOG(3, (THIS_FILE, "put fame->size is: %d", frame->size));
     status = pjmedia_delay_buf_put(port->rj11_out_buf, (pj_int16_t*)frame->buf);
     return status;
 }
@@ -65,10 +68,12 @@ pj_status_t external_put_frame(pjmedia_port* data, pjmedia_frame *frame)
 // rj11提供数据给rj_port
 pj_status_t internal_put_frame(pjmedia_port* data, pjmedia_frame *frame)
 {
-    if (NULL == data || NULL == frame)
+    PJ_ASSERT_RETURN(data && frame, -1);
+    
+    if (frame->buf == NULL)
     {
-        PJ_LOG(5, (THIS_FILE, "invalid param"));
-        return -1;
+        PJ_LOG(5, (THIS_FILE, "internal_put_frame  frame->buf == NULL"));
+        return PJ_SUCCESS;
     }
 
     pj_status_t status;
@@ -83,20 +88,29 @@ pj_status_t internal_put_frame(pjmedia_port* data, pjmedia_frame *frame)
 // rj11从rj11_port中获取数据
 pj_status_t internal_get_frame(pjmedia_port* data, pjmedia_frame *frame)
 {
-    if (NULL == data || NULL == frame)
+    PJ_ASSERT_RETURN(data && frame, -1);
+    
+    if (frame->buf == NULL)
     {
-        PJ_LOG(5, (THIS_FILE, "invalid param"));
-        return -1;
+        PJ_LOG(5, (THIS_FILE, "internal_get_frame  frame->buf == NULL"));
+        return PJ_SUCCESS;
     }
-
-    //PJ_LOG(3, (THIS_FILE, "start internal_get_frame. frame->size: %d, data pointer: %p", frame->size, data));
 
     pj_status_t status;
 
     rj_port *port = (rj_port*)(data->port_data.pdata);
 
     status = pjmedia_delay_buf_get(port->rj11_out_buf, (pj_int16_t*)frame->buf);
-    //PJ_LOG(3, (THIS_FILE, "end internal_get_frame"));
+    if(status == PJ_SUCCESS)
+    {
+        PJ_LOG(3, (THIS_FILE, "internal get frame: %d", frame->size));
+    }
+    else
+    {
+        PJ_LOG(3, (THIS_FILE, "internal get frame: failed"));
+    }
+    
+
     return status;
 }
 
@@ -158,10 +172,10 @@ pj_status_t create_rj_port(pj_pool_t *pool,
         PJ_LOG(3, (THIS_FILE, "faied to pjmedia_delay_buf_create"));
         return status;
     }
-    // mport->external.get_frame = &external_get_frame;
+    mport->external.get_frame = &external_get_frame;
     mport->external.put_frame = &external_put_frame;
     mport->internal.get_frame = &internal_get_frame;
-    // mport->internal.put_frame = &internal_put_frame;
+    mport->internal.put_frame = &internal_put_frame;
     mport->external.on_destroy = &rj_destory;
 
     *port = mport;
