@@ -46,7 +46,7 @@ SRC4 = ./src/confsample.c
 BIN4 = confsample
 
 OBJ5 = confsample_w.o 
-SRC5 = ./src/confsample_w.c 
+SRC5 = ./src/confsample_w.c ./src/rj11_port.c
 BIN5 = confsample_w
 
 all: $(BIN)
