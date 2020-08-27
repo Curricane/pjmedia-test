@@ -2,8 +2,8 @@
 #define __PJMUA_H__
 
 /**
- * @file pjsua.h
- * @brief PJSUA API.
+ * @file pjmua.h
+ * @brief PJMUA API.
  */
 
 
@@ -93,7 +93,7 @@ PJ_BEGIN_DECL
 #endif
 
 /**
- * This enumeration represents pjsua state.
+ * This enumeration represents pjmua state.
  */
 typedef enum pjmua_state
 {
@@ -136,14 +136,14 @@ typedef struct pjmua_media_config pjmua_media_config;
 /**
  * This structure describes media configuration, which will be specified
  * when calling #pjmua_init(). Application MUST initialize this structure
- * by calling #pjsua_media_config_default().
+ * by calling #pjmua_media_config_default().
  */
 struct pjmua_media_config
 {
     /**
      * Clock rate to be applied to the conference bridge.
      * If value is zero, default clock rate will be used 
-     * (PJSUA_DEFAULT_CLOCK_RATE, which by default is 16KHz).
+     * (PJMUA_DEFAULT_CLOCK_RATE, which by default is 16KHz).
      */
     unsigned		clock_rate;
 
@@ -194,7 +194,7 @@ struct pjmua_media_config
      * The media quality also sets speex codec quality/complexity to the
      * number.
      *
-     * Default: 5 (PJSUA_DEFAULT_CODEC_QUALITY).
+     * Default: 5 (PJMUA_DEFAULT_CODEC_QUALITY).
      */
     unsigned		quality;
 
@@ -223,7 +223,7 @@ struct pjmua_media_config
     /**
      * Echo canceller tail length, in miliseconds.
      *
-     * Default: PJSUA_DEFAULT_EC_TAIL_LEN
+     * Default: PJMUA_DEFAULT_EC_TAIL_LEN
      */
     unsigned		ec_tail_len;
 
@@ -312,7 +312,7 @@ struct pjmua_media_config
  *
  * @param cfg	The media config to be initialized.
  */
-PJ_DECL(void) pjsua_media_config_default(pjmua_media_config *cfg);
+PJ_DECL(void) pjmua_media_config_default(pjmua_media_config *cfg);
 
 /**
  * Signal all worker threads to quit. This will only wait until internal
@@ -344,7 +344,7 @@ PJ_DECL(pj_pool_t*) pjmua_pool_create(const char *name, pj_size_t init_size,
 				      pj_size_t increment);
 
 /**
- * Initialize pjsua with the specified settings. All the settings are 
+ * Initialize pjmua with the specified settings. All the settings are 
  * optional, and the default values will be used when the config is not
  * specified.
  *
@@ -353,7 +353,7 @@ PJ_DECL(pj_pool_t*) pjmua_pool_create(const char *name, pj_size_t init_size,
  *
  * @return		PJ_SUCCESS on success, or the appropriate error code.
  */
-PJ_DECL(pj_status_t) pjsua_init(const pjmua_media_config *media_cfg);
+PJ_DECL(pj_status_t) pjmua_init(const pjmua_media_config *media_cfg);
 
 
 /**
@@ -412,9 +412,153 @@ PJ_DECL(pjmedia_endpt*) pjmua_get_pjmedia_endpt(void);
  * Internal function to get PJMUA pool factory.
  * Only valid after #pjmua_create() is called.
  *
- * @return		Pool factory currently used by PJSUA.
+ * @return		Pool factory currently used by PJMUA.
  */
 PJ_DECL(pj_pool_factory*) pjmua_get_pool_factory(void);
+
+
+/**
+ * This structure describes information about a particular media port that
+ * has been registered into the conference bridge. Application can query
+ * this info by calling #pjmua_conf_get_port_info().
+ */
+typedef struct pjmua_conf_port_info
+{
+    /** Conference port number. */
+    int	slot_id;
+
+    /** Port name. */
+    pj_str_t		name;
+
+    /** Format. */
+    pjmedia_format	format;
+
+    /** Clock rate. */
+    unsigned		clock_rate;
+
+    /** Number of channels. */
+    unsigned		channel_count;
+
+    /** Samples per frame */
+    unsigned		samples_per_frame;
+
+    /** Bits per sample */
+    unsigned		bits_per_sample;
+
+    /** Tx level adjustment. */
+    float		tx_level_adj;
+
+    /** Rx level adjustment. */
+    float		rx_level_adj;
+
+    /** Number of listeners in the array. */
+    unsigned		listener_cnt;
+
+    /** Array of listeners (in other words, ports where this port is 
+     *  transmitting to).
+     */
+    int	listeners[PJMUA_MAX_CONF_PORTS];
+
+} pjmua_conf_port_info;
+
+/**
+ * This structure specifies the parameters for conference ports connection.
+ * Use pjmua_conf_connect_param_default() to initialize this structure with
+ * default values.
+ */
+typedef struct pjmua_conf_connect_param
+{
+    /*
+     * Signal level adjustment from the source to the sink to make it
+     * louder or quieter. Value 1.0 means no level adjustment,
+     * while value 0 means to mute the port.
+     *
+     * Default: 1.0
+     */
+    float		level;
+
+} pjmua_conf_connect_param;
+
+/**
+ * Initialize pjmua_conf_connect_param with default values.
+ *
+ * @param prm		The parameter.
+ */
+PJ_DECL(void) pjmua_conf_connect_param_default(pjmua_conf_connect_param *prm);
+
+
+/**
+ * Get maxinum number of conference ports.
+ *
+ * @return		Maximum number of ports in the conference bridge.
+ */
+PJ_DECL(unsigned) pjmua_conf_get_max_ports(void);
+
+
+/**
+ * Get current number of active ports in the bridge.
+ *
+ * @return		The number.
+ */
+PJ_DECL(unsigned) pjmua_conf_get_active_ports(void);
+
+
+/**
+ * Enumerate all conference ports.
+ *
+ * @param id		Array of conference port ID to be initialized.
+ * @param count		On input, specifies max elements in the array.
+ *			On return, it contains actual number of elements
+ *			that have been initialized.
+ *
+ * @return		PJ_SUCCESS on success, or the appropriate error code.
+ */
+PJ_DECL(pj_status_t) pjmua_enum_conf_ports(int id[],
+					   unsigned *count);
+
+
+/**
+ * Get information about the specified conference port
+ *
+ * @param port_id	Port identification.
+ * @param info		Pointer to store the port info.
+ *
+ * @return		PJ_SUCCESS on success, or the appropriate error code.
+ */
+PJ_DECL(pj_status_t) pjmua_conf_get_port_info( int port_id,
+					       pjmua_conf_port_info *info);
+
+
+/**
+ * Add arbitrary media port to PJMUA's conference bridge. Application
+ * can use this function to add the media port that it creates. For
+ * media ports that are created by PJMUA-LIB (such as calls, file player,
+ * or file recorder), PJMUA-LIB will automatically add the port to
+ * the bridge.
+ *
+ * @param pool		Pool to use.
+ * @param port		Media port to be added to the bridge.
+ * @param p_id		Optional pointer to receive the conference 
+ *			slot id.
+ *
+ * @return		PJ_SUCCESS on success, or the appropriate error code.
+ */
+PJ_DECL(pj_status_t) pjmua_conf_add_port(pj_pool_t *pool,
+					 pjmedia_port *port,
+					 int *p_id);
+
+
+/**
+ * Remove arbitrary slot from the conference bridge. Application should only
+ * call this function if it registered the port manually with previous call
+ * to #pjmua_conf_add_port().
+ *
+ * @param port_id	The slot id of the port to be removed.
+ *
+ * @return		PJ_SUCCESS on success, or the appropriate error code.
+ */
+PJ_DECL(pj_status_t) pjmua_conf_remove_port(int port_id);
+
 
 
 PJ_END_DECL

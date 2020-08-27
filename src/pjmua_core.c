@@ -53,7 +53,7 @@ PJ_DEF(void) pjmua_media_config_default(pjmua_media_config *cfg)
 }
 
 /*****************************************************************************
- * PJSUA Base API.
+ * PJMUA Base API.
  */
 
 PJ_DEF(void) pjmua_stop_worker_threads(void)
@@ -107,6 +107,8 @@ PJ_DEF(pj_status_t) pjmua_create(void)
     /* Set default sound device ID */
     pjmua_var.cap_dev = PJMEDIA_AUD_DEFAULT_CAPTURE_DEV;
     pjmua_var.play_dev = PJMEDIA_AUD_DEFAULT_PLAYBACK_DEV;
+    pjmua_var.cap_rj11_dev = -3;
+    pjmua_var.play_rj11_dev = -4;
 
     /* init caching pool */
     pj_caching_pool_init(&pjmua_var.cp, NULL, 0);
@@ -157,8 +159,8 @@ PJ_DEF(pj_status_t) pjmua_init(const pjmua_media_config *media_cfg)
         media_cfg = &default_media_cfg;
     }
 
-    /* Initialize PJSUA media subsystem */
-    status = pjsua_media_subsys_init(media_cfg);
+    /* Initialize PJMUA media subsystem */
+    status = pjmua_media_subsys_init(media_cfg);
     if (status != PJ_SUCCESS)
     {
         goto on_error;
@@ -277,7 +279,7 @@ PJ_DEF(pj_status_t) pjmua_start(void)
 
     status = pjmua_media_subsys_start();
     if (status != PJ_SUCCESS)
-	goto on_return;
+	    goto on_return;
 
    // todo
 
