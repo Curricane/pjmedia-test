@@ -1,5 +1,6 @@
 #include <pjmedia-audiodev/audiodev.h>
-#include "../include/pjmedia/rj11_port.h"
+// #include "../include/pjmedia/rj11_port.h"
+// #include "../include/pjmedia/adapter_port.h"
 #include <pjmedia.h>
 #include <pjlib-util.h>	/* pj_getopt */
 #include <pjlib.h>
@@ -13,185 +14,7 @@
 #define THIS_FILE   "confsample_w.c"
 #define RECORDER 1
 
-struct rj_port
-{
-    pjmedia_port external;
-    pjmedia_port internal;
-    pjmedia_delay_buf *rj11_in_buf;
-    pjmedia_delay_buf *rj11_out_buf;
-};
 
-typedef struct rj_port rj_port;
-
-// conf从rj_port获取数据
-pj_status_t external_get_frame(pjmedia_port* data, pjmedia_frame *frame)
-{
-    PJ_ASSERT_RETURN(data && frame, -1);
-    
-    if (frame->buf == NULL)
-    {
-        PJ_LOG(5, (THIS_FILE, "external_get_frame  frame->buf == NULL"));
-        return PJ_SUCCESS;
-    }
-
-    pj_status_t status;
-
-    rj_port *port = (rj_port *)data;
-    PJ_ASSERT_RETURN(port->rj11_in_buf != NULL, -1);
-
-    status = pjmedia_delay_buf_get(port->rj11_in_buf, (pj_int16_t*)frame->buf);
-    if(status == PJ_SUCCESS)
-    {
-        PJ_LOG(3, (THIS_FILE, "external get frame: %d", frame->size));
-    }
-    else
-    {
-        PJ_LOG(3, (THIS_FILE, "external get frame: failed"));
-    }
-    return status;
-}
-
-// conf提供数据给rj_port
-pj_status_t external_put_frame(pjmedia_port* data, pjmedia_frame *frame)
-{
-
-    PJ_ASSERT_RETURN(data && frame, -1);
-    
-    if (frame->buf == NULL)
-    {
-        PJ_LOG(5, (THIS_FILE, "external_put_frame  frame->buf == NULL"));
-        return PJ_SUCCESS;
-    }
-
-    pj_status_t status;
-
-    rj_port *port = (rj_port *)data;
-    PJ_ASSERT_RETURN(port->rj11_out_buf != NULL, -1);
-    
-    PJ_LOG(3, (THIS_FILE, "external put fame->size is: %d", frame->size));
-    status = pjmedia_delay_buf_put(port->rj11_out_buf, (pj_int16_t*)frame->buf);
-    return status;
-}
-
-// rj11提供数据给rj_port
-pj_status_t internal_put_frame(pjmedia_port* data, pjmedia_frame *frame)
-{
-    PJ_ASSERT_RETURN(data && frame, -1);
-    
-    if (frame->buf == NULL)
-    {
-        PJ_LOG(5, (THIS_FILE, "internal_put_frame  frame->buf == NULL"));
-        return PJ_SUCCESS;
-    }
-
-    pj_status_t status;
-
-    rj_port *port = (rj_port*)(data->port_data.pdata);
-
-    PJ_LOG(3, (THIS_FILE, "internal put fame->size is: %d", frame->size));
-
-    status = pjmedia_delay_buf_put(port->rj11_in_buf, (pj_int16_t*)frame->buf);
-
-    return status;
-}
-
-// rj11从rj11_port中获取数据
-pj_status_t internal_get_frame(pjmedia_port* data, pjmedia_frame *frame)
-{
-    PJ_ASSERT_RETURN(data && frame, -1);
-    
-    if (frame->buf == NULL)
-    {
-        PJ_LOG(5, (THIS_FILE, "internal_get_frame  frame->buf == NULL"));
-        return PJ_SUCCESS;
-    }
-
-    pj_status_t status;
-
-    rj_port *port = (rj_port*)(data->port_data.pdata);
-
-    status = pjmedia_delay_buf_get(port->rj11_out_buf, (pj_int16_t*)frame->buf);
-    if(status == PJ_SUCCESS)
-    {
-        PJ_LOG(3, (THIS_FILE, "internal get frame: %d", frame->size));
-    }
-    else
-    {
-        PJ_LOG(3, (THIS_FILE, "internal get frame: failed"));
-    }
-    
-
-    return status;
-}
-
-pj_status_t rj_destory(pjmedia_port* data)
-{
-    PJ_LOG(3, (THIS_FILE, "start rj_destory"));
-    if (NULL == data)
-    {
-        PJ_LOG(5, (THIS_FILE, "invalid param"));
-        return PJ_SUCCESS;
-    }
-    
-    pj_status_t status;
-    rj_port *port = (rj_port *)data;
-
-    status = pjmedia_delay_buf_destroy(port->rj11_in_buf);
-    status = pjmedia_delay_buf_destroy(port->rj11_out_buf);
-    
-    return status;
-}
-
-pj_status_t create_rj_port(pj_pool_t *pool, 
-    int clock_rate,
-    int channel_count,
-    int bits_per_sample,
-    int samples_per_frame,
-    rj_port **port)
-{
-    const pj_str_t RJ_PORT = {"RJ_PORT", 7};
-    pj_status_t status;
-    rj_port *mport;
-    unsigned int ptime;
-
-    ptime = samples_per_frame * 1000 / clock_rate / 
-	    channel_count;
-
-    mport = PJ_POOL_ZALLOC_T(pool, rj_port);
-
-    pjmedia_port_info_init(&mport->external.info, &RJ_PORT, 0, 
-        clock_rate, channel_count, bits_per_sample, samples_per_frame);
-    pjmedia_port_info_init(&mport->internal.info, &RJ_PORT, 0, 
-        clock_rate, channel_count, bits_per_sample, samples_per_frame);
-    
-    status = pjmedia_delay_buf_create(pool, RJ_PORT.ptr, clock_rate,
-        samples_per_frame, channel_count, ptime * 2, 0, &mport->rj11_in_buf);
-    if(status != PJ_SUCCESS)
-    {
-        PJ_LOG(3, (THIS_FILE, "faied to pjmedia_delay_buf_create"));
-        return status;
-    }
-
-    // 保存所属port的指针
-    mport->internal.port_data.pdata = mport;
-
-    status = pjmedia_delay_buf_create(pool, RJ_PORT.ptr, clock_rate,
-        samples_per_frame, channel_count, ptime * 2, 0, &mport->rj11_out_buf);
-    if(status != PJ_SUCCESS)
-    {
-        PJ_LOG(3, (THIS_FILE, "faied to pjmedia_delay_buf_create"));
-        return status;
-    }
-    mport->external.get_frame = &external_get_frame;
-    mport->external.put_frame = &external_put_frame;
-    mport->internal.get_frame = &internal_get_frame;
-    mport->internal.put_frame = &internal_put_frame;
-    mport->external.on_destroy = &rj_destory;
-
-    *port = mport;
-
-    return PJ_SUCCESS;
-}
 /* 显示的声明pjmedia_conf，才能显示使用pjmeida_conf中的参数
  * Conference bridge.
  */
@@ -253,27 +76,6 @@ static void conf_list(pjmedia_conf *conf, pj_bool_t detail);
 /* Display VU meter */
 static void monitor_level(pjmedia_conf *conf, int slot, int dir, int dur);
 
-// 徐亚给这个port加上存储数据的功能
-pj_status_t spk_put_frame(pjmedia_port *this_port, 
-			     pjmedia_frame *frame)
-{
-    pjmedia_rj11_port *rj11_port = (pjmedia_rj11_port*)this_port->port_data.pdata;
-    return PJ_SUCCESS;
-}
-
-pj_status_t spk_get_frame (pjmedia_port *this_port, 
-			     pjmedia_frame *frame)
-{
-    static int get_count = 0;
-    if (get_count > 2147483647)
-        get_count = 0;
-    ++get_count;
-    if (get_count % 1000 == 0)
-    {
-        PJ_LOG(3, (THIS_FILE, "spk_get_frame: %d", get_count));
-    }
-    return PJ_SUCCESS;
-}
 
 /* Show usage */
 static void usage(void)
@@ -501,16 +303,17 @@ int main(int argc, char *argv[])
 
     // snd缺少一个port去add
     // spk_snd->port = PJ_POOL_ZALLOC_T(pool, pjmedia_port);
-    rj_port* rj;
-    status = create_rj_port(pool, conf->clock_rate,
+    adaptor_port *adp_port;
+
+    status = create_adaptor_port(pool, conf->clock_rate,
         conf->channel_count, conf->bits_per_sample,
-        conf->samples_per_frame, &rj);
+        conf->samples_per_frame, &adp_port);
     if (status != PJ_SUCCESS)
     {
-        PJ_LOG(3, (THIS_FILE, "failed to create_rj_port"));
+        PJ_LOG(3, (THIS_FILE, "failed to create_adp_port_port"));
         return -1;
     }
-    spk_snd->port = &rj->internal;
+    spk_snd->port = &adp_port->internal_port;
     // pj_str_t spk_port_name = {"Snd", 3};
     // pjmedia_port_info_init(&spk_snd->port->info, 
     //     &spk_port_name, 0, conf->clock_rate, 
@@ -522,7 +325,7 @@ int main(int argc, char *argv[])
     // spk_snd->port->put_frame = spk_put_frame;
     // 把snd 变为conf_port
     unsigned int slot_num;
-    pjmedia_conf_add_port(conf, pool, &rj->external, &spk_name, &slot_num);
+    pjmedia_conf_add_port(conf, pool, &adp_port->external_port, &spk_name, &slot_num);
     if (status != PJ_SUCCESS)
     {
         PJ_LOG(3, (THIS_FILE, "failed to pjmedia_conf_add_port add snd"));
@@ -535,7 +338,10 @@ int main(int argc, char *argv[])
     //     return status;
     // }
 
-
+    if (PJMEDIA_WEBRTC_AEC_USE_MOBILE == 0)
+    {
+        PJ_LOG(3, (THIS_FILE, "PJMEDIA_WEBRTC_AEC_USE_MOBILE == 0"));
+    }
     /*
      * UI Menu: 
      */
